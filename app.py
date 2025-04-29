@@ -43,7 +43,6 @@ def next_clause():
     st.session_state.step = "1"
     st.session_state.last_verdict = False
     st.session_state.form_submitted = False
-    st.rerun()
 
 # Toggle AI assistant
 def toggle_ai_assistant():
