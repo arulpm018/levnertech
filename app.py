@@ -43,14 +43,19 @@ def next_clause():
     st.session_state.step = "1"
     st.session_state.last_verdict = False
     st.session_state.form_submitted = False
+    # wipe out old AI assistant inputs/responses
+    for k in ("assistant_query", "assistant_response"):
+        st.session_state.pop(k, None)
+
 
 # Toggle AI assistant
 def toggle_ai_assistant():
     st.session_state.show_ai_assistant = not st.session_state.show_ai_assistant
     
-# Switch assessment mode
+# Switch assessment mode with rerun
 def switch_assessment_mode(mode):
     st.session_state.assessment_mode = mode
+    st.rerun()  # Add this line to immediately refresh the UI
 
 # Check if current step is a terminal step (leads to verdict)
 def is_terminal_step(cid, step):
@@ -117,16 +122,20 @@ def display_analysis(analysis):
 if st.session_state.show_ai_assistant:
     with st.expander("ISO 27001 AI Assistant", expanded=True):
         cid = clause_ids[st.session_state.clause_idx] if st.session_state.clause_idx < total_clauses else None
-        clause_context = None
-        if cid:
-            clause_context = f"{cid}: {decision_trees[cid]['title']}"
-        
+        clause_context = f"{cid}: {decision_trees[cid]['title']}" if cid else None
+
+        # user types, but we don't call the API until they click “Ask”
         user_query = st.text_input("Ask a question about ISO 27001 compliance:", key="assistant_query")
-        if user_query:
-            response = ai_assistant_response(user_query, clause_context)
-            st.write(response)
+
+        # explicit “Ask” button
+        if st.button("Ask", key="ask_ai") and user_query:
+            st.session_state.assistant_response = ai_assistant_response(user_query, clause_context)
+
+        # only display what we already fetched
+        if st.session_state.get("assistant_response"):
+            st.write(st.session_state.assistant_response)
             st.divider()
-        
+
         st.info("Ask questions about ISO 27001 requirements, implementation advice, or clarification about specific clauses.")
 
 # If all clauses done, show results
@@ -252,16 +261,18 @@ else:
 
     st.header(f"Clause {cid}: {title}")
     
-    # Assessment mode selector
+    # Assessment mode selector - modified implementation
     mode_col1, col2, mode_col3 = st.columns([1, 2, 1])
     
     with mode_col1:
         if st.button("Structured Assessment", 
-                    type="primary" if st.session_state.assessment_mode == "structured" else "secondary"):
+                    type="primary" if st.session_state.assessment_mode == "structured" else "secondary",
+                    key="structured_btn"):
             switch_assessment_mode("structured")
     with mode_col3:
         if st.button("Open-Ended Assessment", 
-                    type="primary" if st.session_state.assessment_mode == "open_ended" else "secondary"):
+                    type="primary" if st.session_state.assessment_mode == "open_ended" else "secondary",
+                    key="open_ended_btn"):
             switch_assessment_mode("open_ended")
     
     # Evidence upload for either mode
@@ -427,8 +438,6 @@ else:
             else:
                 st.button("View Results", on_click=next_clause)
                 
-
-
 
 
 # Add an insights section on the sidebar
